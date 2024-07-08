@@ -1,0 +1,104 @@
+# name: test/sql/ulid.test
+# description: test ulid extension
+# group: [ulid]
+
+require ulid
+
+statement ok
+CREATE TABLE t1 AS SELECT ulid() AS ulid;
+
+sleep 1 millisecond
+
+query I
+SELECT ulid() > t1.ulid AS cmp FROM t1;
+----
+true
+
+# Roundtrip varchar cast test
+statement ok
+SELECT ulid()::VARCHAR::ulid;
+
+# Varchar cast failure test
+statement error
+SELECT 'A>>>>>>>>>>>>>>>>>>>>>>>>>'::ulid;
+----
+Conversion Error: Invalid ULID string: invalid character '>' at position 1
+
+# Varchar cast success test
+query I
+SELECT '01AN4Z07BY79KA1307SR9X4MV3'::ulid::uhugeint;
+----
+1772072868548111945193852199469470563
+
+# Ordering test
+statement ok
+CREATE TABLE t2 (key ULID, val INT);
+
+statement ok
+INSERT INTO t2 VALUES (ulid(), 1);
+
+sleep 1 millisecond
+
+statement ok
+INSERT INTO t2 VALUES (ulid(), 2);
+
+sleep 1 millisecond
+
+statement ok
+INSERT INTO t2 VALUES (ulid(), 3);
+
+sleep 1 millisecond
+
+statement ok
+INSERT INTO t2 VALUES (ulid(), 4);
+
+query I
+SELECT val FROM t2 ORDER BY key DESC;
+----
+4
+3
+2
+1
+
+query I
+SELECT val FROM t2 ORDER BY key ASC;
+----
+1
+2
+3
+4
+
+# Should sort the same in the string representation
+
+query I
+SELECT val FROM t2 ORDER BY key::VARCHAR DESC;
+----
+4
+3
+2
+1
+
+query I
+SELECT val FROM t2 ORDER BY key::VARCHAR ASC;
+----
+1
+2
+3
+4
+
+# And also in the uhugeint representation
+query I
+SELECT val FROM t2 ORDER BY key::uhugeint DESC;
+----
+4
+3
+2
+1
+
+query I
+SELECT val FROM t2 ORDER BY key::uhugeint ASC;
+----
+1
+2
+3
+4
